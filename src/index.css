@@ -1,12 +1,32 @@
-*, *::before, *::after {
+@import url('https://fonts.googleapis.com/css2?family=Bungee&family=Raleway:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* Palette */
+  --off-white: #f6f5f2; /* mostly white, faint warm cast */
+  --retro-orange: #c2410c;
+  --retro-orange-bright: #ea580c;
+  --cream: #ffffff;
+  --ink: #5b3a1a;
+}
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
-  font-family: system-ui, sans-serif;
-  background: #0f0f0f;
-  color: #e8e8e8;
+  font-family: 'Raleway', system-ui, sans-serif;
+  color: var(--retro-orange);
   line-height: 1.6;
+  background: var(--off-white);
+  /* The header is the whole landing screen — lock it to one non-scrolling page. */
+  height: 100vh;
+  overflow: hidden;
 }

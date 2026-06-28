@@ -1,8 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Bungee&family=Raleway:wght@400;500;600;700;800&display=swap');
 
 :root {
+  color-scheme: light;
   /* Palette */
-  --off-white: #f6f5f2; /* mostly white, faint warm cast */
+  --off-white: #f7f2e1; /* warm cream */
   --retro-orange: #c2410c;
   --retro-orange-bright: #ea580c;
   --cream: #ffffff;
@@ -29,4 +30,12 @@ body {
   /* The header is the whole landing screen — lock it to one non-scrolling page. */
   height: 100vh;
   overflow: hidden;
+}
+
+@media (max-width: 963px) {
+  body {
+    height: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
 }

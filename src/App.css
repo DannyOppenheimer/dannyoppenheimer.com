@@ -18,6 +18,15 @@
   pointer-events: none;
 }
 
+/* The custom comedic cursor + its trail, drawn above everything. Clicks fall
+   straight through to the page below. */
+.cursor-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+}
+
 /* Name sits to the upper-right of the photo blade. Grass is carved out from
    behind it (handled in GrassField). */
 .hero__name {
@@ -70,11 +79,311 @@
 
 .hero__name--dancing {
   animation: neon-name 2.4s linear infinite;
-  text-shadow: 0 0 18px currentColor, 0 0 6px currentColor;
+  text-shadow: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .hero__name--dancing {
+    animation: none;
+  }
+}
+
+/* ===========================================================================
+   Mobile layout — stacked vertically, scrollable, no mouse influence
+   =========================================================================== */
+@media (max-width: 963px) {
+  .hero {
+    height: auto;
+    /* 850px floor ensures the canvas never collapses so short that the pfp,
+       name, and icon grid physically overlap on landscape / short viewports. */
+    min-height: max(140vh, 850px);
+  }
+
+  /* Centre and enlarge the name below the pfp. Flex-column centres both
+     word spans horizontally so "DANNY" aligns under "OPPENHEIMER".
+     300px floor keeps the name clear of the pfp on any short viewport. */
+  .hero__name {
+    top: max(300px, 46vh);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: clamp(2.2rem, 11vw, 4.5rem);
+    line-height: 1;
+    max-width: none;
+    white-space: nowrap;
+  }
+}
+
+/* ===========================================================================
+   Projects "page" — a faked route. An orange stadium (the bar's exact shape)
+   scales up out of the PROJECTS button to fill the screen while the title
+   travels up to the top-centre.
+   =========================================================================== */
+.projects {
+  position: fixed;
+  inset: 0;
+  z-index: 100; /* above the page, below the custom cursor (z 9999) */
+  /* The page's "orange". Defaults to the resting brand colour, but is driven to
+     a live, drifting neon hue when the page is opened mid dance-party. */
+  --proj-bg: var(--retro-orange);
+}
+
+/* Final beat of the close: the collapsed overlay (bar-shaped veil + parked
+   title) fades into the identical live canvas bar beneath, so the title melts
+   onto the canvas's label instead of snapping to it on unmount. */
+.projects.is-leaving {
+  opacity: 0;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+/* The veil. At scale 1 it's the bar's stadium exactly (width/height/rounding
+   set inline from the bar's geometry), centred on the button; scaling uniformly
+   up to cover the screen keeps that same elongated bar silhouette. */
+.projects__veil {
+  position: fixed;
+  background: var(--proj-bg);
+  transform-origin: center;
+  transition: transform 0.7s cubic-bezier(0.65, 0, 0.35, 1);
+  will-change: transform;
+}
+
+/* Solid band pinned to the top: scrolling content slides out of sight beneath
+   it instead of bleeding over the fixed title. Fades in with the page and out
+   as the veil collapses. */
+.projects__topfade {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: clamp(5.5rem, 15vh, 8.5rem);
+  z-index: 102;
+  background: var(--proj-bg);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.projects__topfade.is-open {
+  opacity: 1;
+  transition: opacity 0.4s ease 0.35s; /* wait for the veil to fill first */
+}
+
+/* The white title that flies from the button to the top of the page. */
+.projects__title {
+  position: fixed;
+  z-index: 103; /* above the top fade band */
+  margin: 0;
+  font-family: 'Bungee', 'Raleway', system-ui, sans-serif;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--off-white);
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+  /* A touch quicker than the veil's 0.7s grow so the title keeps pace with the
+     orange's fast-travelling edge and settles in just as it fills the screen,
+     instead of trailing behind it. */
+  transition: top 0.61s cubic-bezier(0.65, 0, 0.35, 1),
+    left 0.61s cubic-bezier(0.65, 0, 0.35, 1),
+    transform 0.61s cubic-bezier(0.65, 0, 0.35, 1),
+    font-size 0.61s cubic-bezier(0.65, 0, 0.35, 1);
+  will-change: top, left, transform, font-size;
+}
+
+/* The scrollable content layer. Fades in once the circle has filled the
+   screen, and out quickly when closing. */
+.projects__page {
+  position: fixed;
+  inset: 0;
+  z-index: 101;
+  overflow-y: auto;
+  padding: clamp(7rem, 16vh, 11rem) clamp(1rem, 3vw, 3.5rem) 5rem;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.projects__page.is-open {
+  opacity: 1;
+  transition: opacity 0.4s ease 0.35s; /* wait for the circle to fill first */
+}
+
+/* Title-coloured back arrow, top-left. Large padding for an easy hit target.
+   Fades in once the veil has filled and out as it collapses. */
+.projects__back {
+  position: fixed;
+  top: clamp(0.6rem, 3vh, 1.5rem);
+  left: clamp(0.6rem, 2vw, 1.5rem);
+  z-index: 104;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.4rem;
+  border: none;
+  background: none;
+  color: var(--off-white);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.projects__back.is-open {
+  opacity: 1;
+  transition: opacity 0.4s ease 0.35s;
+}
+.projects__back:hover {
+  opacity: 0.75;
+}
+
+/* ---- list & project items ---- */
+
+.projects__list {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  max-width: 76rem;
+}
+
+/* Each project item occupies the full list width, with the pill floated
+   left or right inside it. */
+.project {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1.75rem;
+}
+
+/* ---- collapsed pill ---- */
+
+.project__pill-row {
+  display: flex;
+  justify-content: flex-start;
+  transition: opacity 0.18s ease, max-height 0.3s ease 0.18s;
+  max-height: 80px;
+  overflow: hidden;
+}
+
+.project--right .project__pill-row {
+  justify-content: flex-end;
+}
+
+.project--open .project__pill-row {
+  opacity: 0;
+  max-height: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, max-height 0.25s ease 0.1s;
+}
+
+.project__pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.6rem 1.6rem;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-radius: 100px;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.project__pill:hover {
+  border-color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.project__pill-title {
+  margin: 0;
+  font-family: 'Bungee', 'Raleway', system-ui, sans-serif;
+  font-weight: 400;
+  font-size: clamp(1.1rem, 2.2vw, 1.5rem);
+  color: var(--off-white);
+  white-space: nowrap;
+}
+
+/* ---- expanded content ---- */
+
+/* Outer wrapper: grid trick for smooth height 0 → auto animation */
+.project__body-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.52s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.project--open .project__body-wrap {
+  grid-template-rows: 1fr;
+}
+
+/* Inner overflow clip required by the grid trick */
+.project__body {
+  overflow: hidden;
+}
+
+/* Content fades + slides in from above (approximates title travelling from pill) */
+.project__body-inner {
+  padding-top: 0.4rem;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.3s ease, transform 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.project--open .project__body-inner {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.38s ease 0.18s, transform 0.42s cubic-bezier(0.4, 0, 0.2, 1) 0.18s;
+}
+
+.project__link {
+  text-decoration: none;
+}
+
+.project__title {
+  margin: 0 0 0.5rem;
+  font-family: 'Bungee', 'Raleway', system-ui, sans-serif;
+  font-weight: 400;
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  color: var(--off-white, #fff);
+}
+
+.project__desc {
+  margin: 0 0 1rem;
+  max-width: 52rem;
+  font-family: 'Raleway', system-ui, sans-serif;
+  font-size: clamp(1rem, 1.6vw, 1.15rem);
+  line-height: 1.5;
+  color: var(--off-white, #fff);
+}
+
+.project__img {
+  display: block;
+  width: 100%;
+  max-width: 56rem;
+  height: auto;
+  border-radius: 0.5rem;
+  box-shadow: 0 8px 24px rgba(60, 25, 5, 0.35);
+}
+
+/* ---- ring animation overlay ---- */
+/* Positioned and animated entirely via WAAPI so border-width stays 2px */
+.project__anim-ring {
+  position: fixed;
+  border: 2px solid rgba(255, 255, 255, 0.62);
+  border-radius: 100px;
+  pointer-events: none;
+  z-index: 200;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .projects__veil,
+  .projects__title,
+  .projects__topfade,
+  .projects__topfade.is-open,
+  .projects__back,
+  .projects__back.is-open,
+  .projects__page,
+  .projects__page.is-open,
+  .project__pill-row,
+  .project--open .project__pill-row,
+  .project__body-wrap,
+  .project--open .project__body-wrap,
+  .project__body-inner,
+  .project--open .project__body-inner {
+    transition: none;
     animation: none;
   }
 }

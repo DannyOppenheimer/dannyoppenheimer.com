@@ -1,0 +1,17 @@
+Spyfall:
+https://spyfall.azurewebsites.net/
+Description:
+A minimalist online version of the popular social deduction game of Spyfall, built with JS
+
+BracketHub:
+https://bracketplexus-b30b9.web.app/
+Description
+Bringing march-madness style tournament grouping, picking, and scoring to any custom tournament. Compete with friends, join public brackets, all for free. Built with React & Firebase.
+
+Drawtex
+https://github.com/DannyOppenheimer/Drawtex
+A Machine-Learning backed note taking app that quickly and easily converts drawn diagrams into Latex. Built with Python, Pytorch, sci-kit learn, and more.
+
+Senior Map:
+https://apc-mhs.com/seniormap/
+Contributed to a long-running high school project tracking post-grad plans. Updated and integrated new Google Maps API features.

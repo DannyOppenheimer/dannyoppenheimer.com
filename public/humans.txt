@@ -1,0 +1,12 @@
+/* TEAM */
+Developer: Danny Oppenheimer
+Email: oppenheimerd1@gmail.com
+GitHub: https://github.com/DannyOppenheimer
+
+/* SITE */
+Last update: 2026-06-28
+Standards: HTML5, CSS3, ES6+, React
+Components: Vite, JSX
+
+/* THANKS */
+Built with love for the web.

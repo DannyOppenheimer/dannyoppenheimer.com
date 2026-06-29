@@ -22,24 +22,28 @@ const PROJECTS = [
     href: 'https://bracketplexus-b30b9.web.app/',
     img: '/projects/brackethub.png',
     desc: 'Bringing march-madness style tournament grouping, picking, and scoring to any custom tournament. Compete with friends, join public brackets, all for free. Built with React & Firebase.',
+    altText: 'BracketHub tournament bracket interface showing custom tournament creation and competition features',
   },
   {
     title: 'Drawtex',
     href: 'https://github.com/DannyOppenheimer/Drawtex',
     img: '/projects/drawtex.png',
     desc: 'A Machine-Learning backed note taking app that quickly and easily converts drawn diagrams into Latex. Built with Python, PyTorch, scikit-learn, and more.',
+    altText: 'Drawtex interface demonstrating hand-drawn diagram recognition and LaTeX conversion',
   },
   {
     title: 'Spyfall',
     href: 'https://spyfall.dannyoppenheimer.com/',
     img: '/projects/spyfall.png',
     desc: 'A minimalist online version of the popular social deduction game of Spyfall, built with JS.',
+    altText: 'Spyfall online game interface showing location-based social deduction gameplay',
   },
   {
     title: 'Senior Map',
     href: 'https://apc-mhs.com/seniormap/',
     img: '/projects/seniormap.png',
     desc: 'Contributed to a long-running high school project tracking post-grad plans. Updated and integrated new Google Maps API features.',
+    altText: 'Senior Map showing interactive college and career planning tracker with Google Maps integration',
   },
 ]
 
@@ -244,7 +248,7 @@ export default function ProjectsView({ origin, onClose }) {
           <div className="arcade__panel" aria-live="polite" aria-atomic="true">
             <div key={selected} className="arcade__panel-inner">
               <a href={p.href} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden="true">
-                <img className="arcade__img" src={p.img} alt={`${p.title} screenshot`} />
+                <img className="arcade__img" src={p.img} alt={p.altText} />
               </a>
               <a className="arcade__title-link" href={p.href} target="_blank" rel="noopener noreferrer">
                 <h2 className="arcade__proj-title">{p.title}</h2>

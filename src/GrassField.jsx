@@ -66,6 +66,13 @@ const WHIRL_TIME = 0.225 // s — the email icon's tornado whirl when it swaps g
 const BAR_LAY_DISTANCE = 4 // how far the bar lifts off its root when pushed
 const BAR_REACH_PAD = 50 // cursor reach beyond the bar's edge
 
+// --- Projects title alignment nudge ---
+// Fraction of fontPx to shift the parked "Projects" title so it lands exactly
+// on the canvas label. Tune by refreshing and checking; scales with font size
+// so one value is correct at every viewport size.
+const LABEL_CX_NUDGE = 0 // positive = shift right
+const LABEL_CY_NUDGE = -0.1 // positive = shift down
+
 // --- Title carve (little blades don't render behind the name) ---
 const NAME_PAD = 24 // px the carved hole extends past the text
 
@@ -133,7 +140,7 @@ const MOBILE_ICON_FXS = [0.24, 0.50, 0.76, 0.24, 0.50, 0.76]  // col (x frac) pe
 const MOBILE_ICON_FYS = [0.54, 0.54, 0.54, 0.70, 0.70, 0.70]  // row (y frac) per icon
 const MOBILE_ICON_GAP = 20           // visual gap between grass and icon edges
 const MOBILE_BAR_FY = 0.88            // bar centre as fraction of canvas height
-const WIND_MAX_VEL = 600             // scroll px/s where mobile wind lean reaches 1.0
+const WIND_MAX_VEL = 429             // scroll px/s where mobile wind lean reaches 1.0
 const WIND_LAY = 0.15                // time constant for wind lean growth / wrong-dir shrink
 
 // Icon artwork in a 24×24 viewBox. Brand marks are single fill paths (from
@@ -1474,6 +1481,14 @@ export default function GrassField({ containerRef, nameRef, onDanceChange, onOpe
       // PROJECTS bar: hand its on-screen geometry up to React, which grows an
       // orange circle out of it into the faked projects page (no navigation).
       if (hit && hit.kind === 'bar') {
+        // Snap the bar to its rest position now (before the veil covers it) so
+        // the canvas label sits at exactly (b.x, b.y) — the same point as
+        // origin.cx/cy — for the entire duration the projects page is open.
+        // Without this, residual lean from hovering shifts tipX/tipY away from
+        // the rest centre, causing the canvas label to appear at a different
+        // position than the overlay title during the closing fade.
+        hit.lean = 0
+        hit.lastHit = -Infinity
         // If a dance party is on, hand off the bar's live neon hue (and the drift
         // rate) so the projects page keeps cycling colour seamlessly from here.
         // Also hand off how long until the party's colours fade back to orange
@@ -1487,14 +1502,19 @@ export default function GrassField({ containerRef, nameRef, onDanceChange, onOpe
           else outroStart = dance.phaseStart // already fading out
           fadesIn = (outroStart - performance.now()) / 1000
         }
+        const fontPx = hit.drawnFontPx || Math.round(hit.r * 0.95)
         onOpenProjectsRef.current?.({
           // The bar's rest centre (not its live swayed/leaned tip) — the page
-          // freezes the bar here, so the title parks exactly where it reveals.
+          // freezes the bar here, so the veil collapses back to exactly the
+          // right spot. labelCx/labelCy are separate nudges just for the title
+          // text, correcting for canvas vs CSS font-metric differences.
           cx: rect.left + hit.x,
           cy: rect.top + hit.y,
+          labelCx: rect.left + hit.x + fontPx * LABEL_CX_NUDGE,
+          labelCy: rect.top + hit.y + fontPx * LABEL_CY_NUDGE,
           r: hit.halfLen + hit.r, // stadium half-width (length + cap)
           h: hit.r, // stadium half-height (the bar's radius)
-          fontPx: hit.drawnFontPx || Math.round(hit.r * 0.95), // match the label's real size
+          fontPx, // match the label's real size
           neon,
           hue: neon ? (((hit.liveHue || 0) % 360) + 360) % 360 : 0,
           hueDrift: DANCE_HUE_DRIFT,

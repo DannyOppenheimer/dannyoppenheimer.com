@@ -18,12 +18,6 @@ function neonRgb(h) {
 
 const PROJECTS = [
   {
-    title: 'Spyfall',
-    href: 'https://spyfall.azurewebsites.net/',
-    img: '/projects/spyfall.png',
-    desc: 'A minimalist online version of the popular social deduction game of Spyfall, built with JS.',
-  },
-  {
     title: 'BracketHub',
     href: 'https://bracketplexus-b30b9.web.app/',
     img: '/projects/brackethub.png',
@@ -34,6 +28,12 @@ const PROJECTS = [
     href: 'https://github.com/DannyOppenheimer/Drawtex',
     img: '/projects/drawtex.png',
     desc: 'A Machine-Learning backed note taking app that quickly and easily converts drawn diagrams into Latex. Built with Python, PyTorch, scikit-learn, and more.',
+  },
+  {
+    title: 'Spyfall',
+    href: 'https://spyfall.dannyoppenheimer.com/',
+    img: '/projects/spyfall.png',
+    desc: 'A minimalist online version of the popular social deduction game of Spyfall, built with JS.',
   },
   {
     title: 'Senior Map',
@@ -49,16 +49,12 @@ export default function ProjectsView({ origin, onClose }) {
   const [leaving, setLeaving] = useState(false)
   const rootRef = useRef(null)
 
-  // Which project is currently open (null = all collapsed)
-  const [activeProject, setActiveProject] = useState(null)
-  const activeProjectRef = useRef(null)
-  // Pill rect snapshot that drives the ring animation; keyed so React remounts on change
-  const [animRing, setAnimRing] = useState(null)
-  const ringElRef = useRef(null)
-
-  const pageRef = useRef(null)
-  const pillRefs = useRef([])
-  const projectRefs = useRef([])
+  const [selected, setSelected] = useState(0)
+  const selectedRef = useRef(0)
+  const menuRef = useRef(null)
+  const itemRefs = useRef([])
+  const [cursorY, setCursorY] = useState(0)
+  const wheelCooldown = useRef(false)
 
   // Neon page background when opened mid dance-party
   useLayoutEffect(() => {
@@ -123,134 +119,56 @@ export default function ProjectsView({ origin, onClose }) {
     }
   }, [])
 
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') startClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const navigate = useCallback((dir) => {
+    const next = Math.max(0, Math.min(PROJECTS.length - 1, selectedRef.current + dir))
+    if (next !== selectedRef.current) {
+      selectedRef.current = next
+      setSelected(next)
+    }
   }, [])
 
-  // Each edge of the ring travels straight to its respective screen edge using
-  // the Web Animations API so the 2px border width stays constant throughout.
-  useLayoutEffect(() => {
-    const el = ringElRef.current
-    if (!el || !animRing) return
-    const pad = 60
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    const anim = el.animate(
-      [
-        {
-          left: `${animRing.left}px`,
-          top: `${animRing.top}px`,
-          width: `${animRing.width}px`,
-          height: `${animRing.height}px`,
-          borderRadius: '100px',
-          opacity: '0.75',
-        },
-        {
-          left: `${-pad}px`,
-          top: `${-pad}px`,
-          width: `${vw + pad * 2}px`,
-          height: `${vh + pad * 2}px`,
-          borderRadius: '4px',
-          opacity: '0',
-        },
-      ],
-      { duration: 720, easing: 'cubic-bezier(0.15, 0, 0.5, 1)', fill: 'forwards' },
-    )
-    return () => anim.cancel()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [animRing?.key])
-
-  // Unmount the ring element once its animation has finished
-  useEffect(() => {
-    if (!animRing) return
-    const id = setTimeout(() => setAnimRing(null), 800)
-    return () => clearTimeout(id)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [animRing?.key])
-
-  // Open a project. Pass ring:false to skip the ring animation (e.g. initial load).
-  const activateProject = useCallback((i, { ring = true } = {}) => {
-    if (i === activeProjectRef.current) return
-    activeProjectRef.current = i
-
-    if (ring) {
-      const pill = pillRefs.current[i]
-      if (pill) {
-        const rect = pill.getBoundingClientRect()
-        setAnimRing({
-          left: rect.left,
-          top: rect.top,
-          width: rect.width,
-          height: rect.height,
-          key: `${i}-${Date.now()}`,
-        })
-      }
-    }
-
-    setActiveProject(i)
-  }, [])
-
-  // On scroll, snap to whichever project item's top is closest to 38% down the
-  // container. Simpler and more reliable than IntersectionObserver when all
-  // collapsed pills can fit inside a single viewport.
-  useEffect(() => {
-    if (!expanded) return
-    const container = pageRef.current
-    if (!container) return
-
-    // Open the first project immediately, no ring on initial load.
-    activateProject(0, { ring: false })
-
-    // Brief post-activation pause: Chrome fires synthetic scroll events when
-    // content above the viewport shifts (scroll anchoring). We ignore those for
-    // ~700ms so a newly-opened project doesn't immediately flip to a neighbour
-    // as the previous project's content collapses.
-    const scrollPausedRef = { current: false }
-    let pauseTimer = null
-    const pauseScrollSnap = () => {
-      scrollPausedRef.current = true
-      clearTimeout(pauseTimer)
-      pauseTimer = setTimeout(() => { scrollPausedRef.current = false }, 700)
-    }
-
-    // Patch activateProject to also trigger the pause
-    const activate = (i, opts) => {
-      activateProject(i, opts)
-      if (i !== activeProjectRef.current) pauseScrollSnap() // fires AFTER the ref update inside activateProject
-    }
-
-    const onScroll = () => {
-      if (scrollPausedRef.current) return
-      const snapY = container.getBoundingClientRect().top + container.clientHeight * 0.38
-      let bestIdx = 0
-      let bestDist = Infinity
-      PROJECTS.forEach((_, i) => {
-        const el = projectRefs.current[i]
-        if (!el) return
-        const dist = Math.abs(el.getBoundingClientRect().top - snapY)
-        if (dist < bestDist) { bestDist = dist; bestIdx = i }
-      })
-      if (bestIdx !== activeProjectRef.current) {
-        pauseScrollSnap()
-        activateProject(bestIdx)
-      }
-    }
-
-    container.addEventListener('scroll', onScroll, { passive: true })
-    return () => {
-      container.removeEventListener('scroll', onScroll)
-      clearTimeout(pauseTimer)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expanded, activateProject])
-
-  function startClose() {
+  const startClose = useCallback(() => {
     closingRef.current = true
     setExpanded(false)
-  }
+  }, [])
+
+  // Escape closes, arrow keys navigate the menu
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') startClose()
+      if (e.key === 'ArrowDown') { e.preventDefault(); navigate(1) }
+      if (e.key === 'ArrowUp') { e.preventDefault(); navigate(-1) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [startClose, navigate])
+
+  // Wheel scrolls through projects with a cooldown so one gesture = one step
+  useEffect(() => {
+    if (!expanded) return
+    const el = rootRef.current
+    if (!el) return
+    const onWheel = (e) => {
+      e.preventDefault()
+      if (wheelCooldown.current) return
+      wheelCooldown.current = true
+      navigate(e.deltaY > 0 ? 1 : -1)
+      setTimeout(() => { wheelCooldown.current = false }, 380)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [expanded, navigate])
+
+  // Keep the ▶ cursor vertically centered on the selected item
+  useLayoutEffect(() => {
+    const itemEl = itemRefs.current[selected]
+    const menuEl = menuRef.current
+    if (!itemEl || !menuEl) return
+    const iRect = itemEl.getBoundingClientRect()
+    const mRect = menuEl.getBoundingClientRect()
+    // 24 ≈ cursor glyph height at 1.4rem
+    setCursorY(iRect.top - mRect.top + (iRect.height - 24) / 2)
+  }, [selected, expanded])
 
   function onVeilTransitionEnd(e) {
     if (e.propertyName === 'transform' && closingRef.current) setLeaving(true)
@@ -279,7 +197,11 @@ export default function ProjectsView({ origin, onClose }) {
         transform: 'translate(-50%, -50%)',
         fontSize: 'clamp(2.4rem, 8vw, 5rem)',
       }
-    : { left: `${origin.cx}px`, top: `${origin.cy}px`, transform: 'translate(-50%, -50%)', fontSize: `${origin.fontPx}px` }
+    : { left: `${origin.labelCx ?? origin.cx}px`, top: `${origin.labelCy ?? origin.cy}px`, transform: 'translate(-50%, -50%)', fontSize: `${origin.fontPx}px` }
+
+  const p = PROJECTS[selected]
+
+  const selectProject = (i) => { selectedRef.current = i; setSelected(i) }
 
   return (
     <div className={`projects${leaving ? ' is-leaving' : ''}`} role="dialog" aria-label="Projects" aria-modal="true" ref={rootRef}>
@@ -293,54 +215,48 @@ export default function ProjectsView({ origin, onClose }) {
         </svg>
       </button>
 
-      {/* Ring overlay — WAAPI drives the position/size so border-width stays 2px */}
-      {animRing && (
-        <div key={animRing.key} ref={ringElRef} className="project__anim-ring" />
-      )}
+      <div className={`projects__page${expanded ? ' is-open' : ''}`}>
+        <div className="arcade">
 
-      <div className={`projects__page${expanded ? ' is-open' : ''}`} ref={pageRef}>
-        <ul className="projects__list">
-          {PROJECTS.map((p, i) => {
-            const isActive = activeProject === i
-            const side = i % 2 === 0 ? 'left' : 'right'
-            return (
-              <li
-                key={p.title}
-                ref={el => { projectRefs.current[i] = el }}
-                className={`project project--${side}${isActive ? ' project--open' : ''}`}
+          {/* Left: scrollable menu list */}
+          <nav className="arcade__menu" ref={menuRef} aria-label="Project navigation">
+            <p className="arcade__menu-label">Project Select</p>
+            <div className="arcade__cursor" style={{ transform: `translateY(${cursorY}px)` }} aria-hidden="true">▶</div>
+            {PROJECTS.map((proj, i) => (
+              <div
+                key={proj.title}
+                ref={el => { itemRefs.current[i] = el }}
+                className={`arcade__item${selected === i ? ' arcade__item--sel' : ''}`}
+                onClick={() => selectProject(i)}
+                role="button"
+                tabIndex={0}
+                aria-pressed={selected === i}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') selectProject(i) }}
               >
-                {/* Collapsed pill — alternates left / right */}
-                <div className="project__pill-row">
-                  <div
-                    className="project__pill"
-                    ref={el => { pillRefs.current[i] = el }}
-                    onClick={() => activateProject(i)}
-                    role="button"
-                    tabIndex={isActive ? -1 : 0}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') activateProject(i) }}
-                  >
-                    <h2 className="project__pill-title">{p.title}</h2>
-                  </div>
-                </div>
+                <span className="arcade__num">0{i + 1}</span>
+                <span className="arcade__name">{proj.title}</span>
+              </div>
+            ))}
+            <p className="arcade__hint">↑ ↓ to navigate</p>
+          </nav>
 
-                {/* Expanded content — height animates via CSS grid trick */}
-                <div className="project__body-wrap">
-                  <div className="project__body">
-                    <div className="project__body-inner">
-                      <a className="project__link" href={p.href} target="_blank" rel="noopener noreferrer">
-                        <h2 className="project__title">{p.title}</h2>
-                      </a>
-                      <p className="project__desc">{p.desc}</p>
-                      <a href={p.href} target="_blank" rel="noopener noreferrer">
-                        <img className="project__img" src={p.img} alt={`${p.title} screenshot`} loading="lazy" />
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+          {/* Right: selected project info */}
+          <div className="arcade__panel" aria-live="polite" aria-atomic="true">
+            <div key={selected} className="arcade__panel-inner">
+              <a href={p.href} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden="true">
+                <img className="arcade__img" src={p.img} alt={`${p.title} screenshot`} />
+              </a>
+              <a className="arcade__title-link" href={p.href} target="_blank" rel="noopener noreferrer">
+                <h2 className="arcade__proj-title">{p.title}</h2>
+              </a>
+              <p className="arcade__proj-desc">{p.desc}</p>
+              <a className="arcade__launch" href={p.href} target="_blank" rel="noopener noreferrer">
+                OPEN →
+              </a>
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
   )

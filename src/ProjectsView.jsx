@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { DEFAULT_PROJECT_SLUG, PROJECTS } from './projects.js'
 
 const ORANGE_RGB = [194, 65, 12]
 function neonRgb(h) {
@@ -16,45 +17,20 @@ function neonRgb(h) {
   return [(r + m) * 255, (g + m) * 255, (b + m) * 255]
 }
 
-const PROJECTS = [
-  {
-    title: 'BracketHub',
-    href: 'https://bracketplexus-b30b9.web.app/',
-    img: '/projects/brackethub.png',
-    desc: 'Bringing march-madness style tournament grouping, picking, and scoring to any custom tournament. Compete with friends, join public brackets, all for free. Built with React & Firebase.',
-    altText: 'BracketHub tournament bracket interface showing custom tournament creation and competition features',
-  },
-  {
-    title: 'Drawtex',
-    href: 'https://github.com/DannyOppenheimer/Drawtex',
-    img: '/projects/drawtex.png',
-    desc: 'A Machine-Learning backed note taking app that quickly and easily converts drawn diagrams into Latex. Built with Python, PyTorch, scikit-learn, and more.',
-    altText: 'Drawtex interface demonstrating hand-drawn diagram recognition and LaTeX conversion',
-  },
-  {
-    title: 'Spyfall',
-    href: 'https://spyfall.dannyoppenheimer.com/',
-    img: '/projects/spyfall.png',
-    desc: 'A minimalist online version of the popular social deduction game of Spyfall, built with JS.',
-    altText: 'Spyfall online game interface showing location-based social deduction gameplay',
-  },
-  {
-    title: 'Senior Map',
-    href: 'https://apc-mhs.com/seniormap/',
-    img: '/projects/seniormap.png',
-    desc: 'Contributed to a long-running high school project tracking post-grad plans. Updated and integrated new Google Maps API features.',
-    altText: 'Senior Map showing interactive college and career planning tracker with Google Maps integration',
-  },
-]
+function projectIndex(slug) {
+  const index = PROJECTS.findIndex(project => project.slug === slug)
+  return index === -1 ? 0 : index
+}
 
-export default function ProjectsView({ origin, onClose }) {
+export default function ProjectsView({ origin, onClose, projectSlug = DEFAULT_PROJECT_SLUG, onProjectChange }) {
   const [expanded, setExpanded] = useState(false)
   const closingRef = useRef(false)
   const [leaving, setLeaving] = useState(false)
   const rootRef = useRef(null)
 
-  const [selected, setSelected] = useState(0)
-  const selectedRef = useRef(0)
+  const initialProject = projectIndex(projectSlug)
+  const [selected, setSelected] = useState(initialProject)
+  const selectedRef = useRef(initialProject)
   const menuRef = useRef(null)
   const itemRefs = useRef([])
   const [cursorY, setCursorY] = useState(0)
@@ -123,13 +99,22 @@ export default function ProjectsView({ origin, onClose }) {
     }
   }, [])
 
+  // Keep the visible project in sync with a shared URL or browser navigation.
+  useEffect(() => {
+    const next = projectIndex(projectSlug)
+    if (next === selectedRef.current) return
+    selectedRef.current = next
+    setSelected(next)
+  }, [projectSlug])
+
   const navigate = useCallback((dir) => {
     const next = Math.max(0, Math.min(PROJECTS.length - 1, selectedRef.current + dir))
     if (next !== selectedRef.current) {
       selectedRef.current = next
       setSelected(next)
+      onProjectChange?.(PROJECTS[next].slug)
     }
-  }, [])
+  }, [onProjectChange])
 
   const startClose = useCallback(() => {
     closingRef.current = true
@@ -205,7 +190,11 @@ export default function ProjectsView({ origin, onClose }) {
 
   const p = PROJECTS[selected]
 
-  const selectProject = (i) => { selectedRef.current = i; setSelected(i) }
+  const selectProject = (i) => {
+    selectedRef.current = i
+    setSelected(i)
+    onProjectChange?.(PROJECTS[i].slug)
+  }
 
   return (
     <div className={`projects${leaving ? ' is-leaving' : ''}`} role="dialog" aria-label="Projects" aria-modal="true" ref={rootRef}>
@@ -247,16 +236,52 @@ export default function ProjectsView({ origin, onClose }) {
           {/* Right: selected project info */}
           <div className="arcade__panel" aria-live="polite" aria-atomic="true">
             <div key={selected} className="arcade__panel-inner">
-              <a href={p.href} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden="true">
-                <img className="arcade__img" src={p.img} alt={p.altText} />
-              </a>
-              <a className="arcade__title-link" href={p.href} target="_blank" rel="noopener noreferrer">
+              {p.video ? (
+                <a className="arcade__media-link" href={p.href} target="_blank" rel="noopener noreferrer" aria-label={`Open ${p.title}`}>
+                  <video
+                    className="arcade__video"
+                    src={p.video}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    aria-label={p.altText}
+                  />
+                </a>
+              ) : p.images ? (
+                <a className="arcade__gallery" href={p.href} target="_blank" rel="noopener noreferrer" aria-label={`Open ${p.title}`}>
+                  {p.images.map(image => (
+                    <img className="arcade__gallery-img" key={image.src} src={image.src} alt={image.alt} />
+                  ))}
+                </a>
+              ) : (
+                <a className="arcade__media-link" href={p.href} target="_blank" rel="noopener noreferrer" aria-label={`Open ${p.title}`}>
+                  <img className="arcade__img" src={p.img} alt={p.altText} />
+                </a>
+              )}
+              {p.href ? (
+                <a
+                  className="arcade__title-link"
+                  href={p.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Open ${p.title} in a new tab`}
+                >
+                  <h2 className="arcade__proj-title">{p.title}</h2>
+                  <svg className="arcade__external-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M14 4h6v6M20 4l-9 9" />
+                    <path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6" />
+                  </svg>
+                </a>
+              ) : (
                 <h2 className="arcade__proj-title">{p.title}</h2>
-              </a>
+              )}
               <p className="arcade__proj-desc">{p.desc}</p>
-              <a className="arcade__launch" href={p.href} target="_blank" rel="noopener noreferrer">
-                OPEN →
-              </a>
+              {p.href && (
+                <a className="arcade__launch" href={p.href} target="_blank" rel="noopener noreferrer">
+                  {p.action ?? 'OPEN →'}
+                </a>
+              )}
             </div>
           </div>
 

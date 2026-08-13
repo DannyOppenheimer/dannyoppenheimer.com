@@ -553,12 +553,14 @@ function openLink(href) {
   }
 }
 
-export default function GrassField({ containerRef, nameRef, onDanceChange, onOpenProjects, projectsOpen }) {
+export default function GrassField({ containerRef, nameRef, onDanceChange, onOpenProjects, onProjectsReady, projectsOpen }) {
   const canvasRef = useRef(null)
   const onDanceChangeRef = useRef(onDanceChange)
   onDanceChangeRef.current = onDanceChange
   const onOpenProjectsRef = useRef(onOpenProjects)
   onOpenProjectsRef.current = onOpenProjects
+  const onProjectsReadyRef = useRef(onProjectsReady)
+  onProjectsReadyRef.current = onProjectsReady
   // True while the projects "page" is up: the bar is hidden behind it, so we
   // freeze its breeze sway (and ease it back in on close) — otherwise the live
   // bar would be at a different sway phase than the title parked on it, and the
@@ -825,6 +827,22 @@ export default function GrassField({ containerRef, nameRef, onDanceChange, onOpe
         bar.x = Math.min(width - bar.halfLen - bar.r - 8, bar.fx * width)
         bar.y = Math.max(bar.r + 8, Math.min(height - bar.r - 8, bar.fy * height))
       }
+
+      const fontPx = bar.drawnFontPx || Math.round(bar.r * 0.95)
+      onProjectsReadyRef.current?.({
+        cx: rect.left + bar.x,
+        cy: rect.top + bar.y,
+        labelCx: rect.left + bar.x + fontPx * LABEL_CX_NUDGE,
+        labelCy: rect.top + bar.y + fontPx * LABEL_CY_NUDGE,
+        r: bar.halfLen + bar.r,
+        h: bar.r,
+        fontPx,
+        neon: false,
+        hue: 0,
+        hueDrift: 0,
+        fadesIn: 0,
+        fadeDur: 0,
+      })
 
       // The title's no-blade box gets its own gap, separate from the other features.
       const featureBoxes = nameBoxes().map((b) => ({

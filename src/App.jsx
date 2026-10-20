@@ -18,6 +18,12 @@ function projectUrl(slug) {
   return `${window.location.pathname}${window.location.search}#projects/${slug}`
 }
 
+// Bare #projects (shows the default project) keeps the shared link clean
+// until the visitor actually picks something from the list.
+function projectsUrl() {
+  return `${window.location.pathname}${window.location.search}#projects`
+}
+
 function pageUrl() {
   return `${window.location.pathname}${window.location.search}`
 }
@@ -46,7 +52,7 @@ export default function App() {
     setProjectSlug(slug)
     setProjectsOrigin(origin)
     pushedProjectHistoryRef.current = true
-    window.history.pushState(null, '', projectUrl(slug))
+    window.history.pushState(null, '', slug === DEFAULT_PROJECT_SLUG ? projectsUrl() : projectUrl(slug))
   }, [])
 
   const changeProject = useCallback((slug) => {

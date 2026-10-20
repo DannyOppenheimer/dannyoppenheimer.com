@@ -70,7 +70,18 @@ export default function CursorTrail() {
       canvas.style.width  = `${width}px`
       canvas.style.height = `${height}px`
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      // Resizing wipes the canvas, so the next frame must repaint.
+      drawnBox = null
+      forceDraw = true
     }
+
+    // What was painted last frame, so each frame clears only that region (not
+    // the whole screen) and skips repainting entirely when nothing changed.
+    let drawnBox = null      // CSS-px bounds of last frame's ink, or null
+    let forceDraw = true
+    let lastCursorX = null, lastCursorY = null  // where the cursor was drawn (null = not drawn)
+    let lastHadStamps = false
+
     resize()
 
     let headX = -9999, headY = -9999
@@ -100,7 +111,7 @@ export default function CursorTrail() {
 
     let raf = 0
     function frame() {
-      ctx.clearRect(0, 0, width, height)
+      let stamps = null
 
       if (seen && inside) {
         // ── Speed → extrusion length EMA ──────────────────────────────────────
@@ -125,7 +136,7 @@ export default function CursorTrail() {
         // stamp position every STAMP_EVERY_PX pixels until we've covered
         // smoothExtruPx total pixels (or run out of history).
         if (silCanvas && smoothExtruPx >= 1 && history.length >= 2) {
-          const stamps = []
+          stamps = []
           let arcDist  = 0
           let nextStop = STAMP_EVERY_PX
 
@@ -147,21 +158,59 @@ export default function CursorTrail() {
             arcDist += seg
             if (arcDist >= smoothExtruPx) break
           }
+        }
+      }
 
+      const hasStamps = !!stamps && stamps.length > 0
+      const showCursor = seen && inside && imgReady
+      const cursorX = showCursor ? headX : null
+      const cursorY = showCursor ? headY : null
+
+      // Nothing on screen would change (cursor parked, no trail now or last
+      // frame) — leave the previous frame up untouched.
+      const unchanged = !forceDraw && !hasStamps && !lastHadStamps &&
+        cursorX === lastCursorX && cursorY === lastCursorY
+
+      if (!unchanged) {
+        // Clear just what was drawn last frame (padded for antialiased edges).
+        if (drawnBox) {
+          ctx.clearRect(drawnBox.l - 2, drawnBox.t - 2, drawnBox.r - drawnBox.l + 4, drawnBox.b - drawnBox.t + 4)
+        }
+        let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity
+
+        if (hasStamps) {
           // Draw oldest stamp first so the one nearest the cursor sits on top,
           // creating a continuous solid extrusion that blends into the cursor.
           for (let i = stamps.length - 1; i >= 0; i--) {
             const p = stamps[i]
+            const x = p.x - cw * HOT_X
+            const y = p.y - ch * HOT_Y
             // silCanvas is cw*dpr × ch*dpr px; specifying cw × ch CSS units
             // lets the DPR transform render it at full physical resolution.
-            ctx.drawImage(silCanvas, p.x - cw * HOT_X, p.y - ch * HOT_Y, cw, ch)
+            ctx.drawImage(silCanvas, x, y, cw, ch)
+            if (x < l) l = x
+            if (y < t) t = y
+            if (x + cw > r) r = x + cw
+            if (y + ch > b) b = y + ch
           }
         }
-      }
 
-      // ── Real cursor — drawn last so it always sits above the extrusion ─────
-      if (seen && inside && imgReady) {
-        ctx.drawImage(img, headX - cw * HOT_X, headY - ch * HOT_Y, cw, ch)
+        // ── Real cursor — drawn last so it always sits above the extrusion ───
+        if (showCursor) {
+          const x = headX - cw * HOT_X
+          const y = headY - ch * HOT_Y
+          ctx.drawImage(img, x, y, cw, ch)
+          if (x < l) l = x
+          if (y < t) t = y
+          if (x + cw > r) r = x + cw
+          if (y + ch > b) b = y + ch
+        }
+
+        drawnBox = l === Infinity ? null : { l, t, r, b }
+        forceDraw = false
+        lastCursorX = cursorX
+        lastCursorY = cursorY
+        lastHadStamps = hasStamps
       }
 
       raf = requestAnimationFrame(frame)

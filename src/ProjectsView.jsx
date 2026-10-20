@@ -69,21 +69,23 @@ export default function ProjectsView({ origin, onClose, projectSlug = DEFAULT_PR
     return Math.max(dy / origin.h, dx / halfLen) * 1.06
   }, [origin])
 
-  // Lock body scroll while open
+  // Lock body scroll while open. Only overflow is touched (no position: fixed
+  // trick) so the page keeps its scroll offset and size; the vanished
+  // scrollbar's width is padded back so the hero (and the grass canvas sized
+  // from it) doesn't widen, re-layout, and snap underneath the overlay.
   useEffect(() => {
-    const y = window.scrollY
+    // The gap is measured from the body's own (fractional) width rather than
+    // innerWidth - clientWidth, which round to whole pixels and leave a
+    // sub-pixel width change at non-100% display scaling or zoom.
     const b = document.body
-    const prev = { overflow: b.style.overflow, position: b.style.position, top: b.style.top, width: b.style.width }
+    const prev = { overflow: b.style.overflow, paddingRight: b.style.paddingRight }
+    const before = b.getBoundingClientRect().width
     b.style.overflow = 'hidden'
-    b.style.position = 'fixed'
-    b.style.top = `-${y}px`
-    b.style.width = '100%'
+    const scrollbar = b.getBoundingClientRect().width - before
+    if (scrollbar > 0) b.style.paddingRight = `${scrollbar}px`
     return () => {
       b.style.overflow = prev.overflow
-      b.style.position = prev.position
-      b.style.top = prev.top
-      b.style.width = prev.width
-      window.scrollTo(0, y)
+      b.style.paddingRight = prev.paddingRight
     }
   }, [])
 

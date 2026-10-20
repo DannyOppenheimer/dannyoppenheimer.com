@@ -156,6 +156,15 @@ const ICON_FILL = {
 
 // ===========================================================================
 
+// Parsed icon paths, built once on first use instead of re-parsing the SVG
+// path strings every frame.
+const PATH_CACHE = new Map()
+function iconPath(d) {
+  let p = PATH_CACHE.get(d)
+  if (!p) PATH_CACHE.set(d, (p = new Path2D(d)))
+  return p
+}
+
 const SWAY_RATE = (2 * Math.PI) / SWAY_PERIOD
 const GRASS_CFG = { lay: LAY_TIME, stand: STAND_TIME, turn: TURN_TIME }
 const PFP_CFG = { lay: PFP_LAY_TIME, stand: PFP_STAND_TIME, turn: PFP_TURN_TIME }
@@ -567,6 +576,12 @@ export default function GrassField({ containerRef, nameRef, onDanceChange, onOpe
   // closing title would visibly snap to the bar on reveal.
   const projectsOpenRef = useRef(projectsOpen)
   projectsOpenRef.current = projectsOpen
+  // Brief window after the projects page closes during which scroll events
+  // don't drive the wind.
+  const scrollQuietUntilRef = useRef(0)
+  useEffect(() => {
+    if (!projectsOpen) scrollQuietUntilRef.current = performance.now() + 400
+  }, [projectsOpen])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -615,6 +630,14 @@ export default function GrassField({ containerRef, nameRef, onDanceChange, onOpe
       const now = performance.now()
       const dt = Math.max((now - scrollTime) / 1000, 0.001)
       const dy = window.scrollY - scrollY
+      // Scroll jumps from opening/closing the projects page (scroll lock,
+      // history scroll restoration) aren't the visitor scrolling — re-baseline
+      // without gusting, or every blade would snap over at once.
+      if (projectsOpenRef.current || now < scrollQuietUntilRef.current) {
+        scrollY = window.scrollY
+        scrollTime = now
+        return
+      }
       scrollVel = dy / dt
       scrollY = window.scrollY
       scrollTime = now
@@ -929,7 +952,7 @@ export default function GrassField({ containerRef, nameRef, onDanceChange, onOpe
       ctx.lineCap = 'round'
       ctx.lineJoin = 'round'
       if (ICON_FILL[name]) {
-        ctx.fill(new Path2D(ICON_FILL[name]))
+        ctx.fill(iconPath(ICON_FILL[name]))
       } else if (name === 'camera') {
         // Detailed SLR: body, pentaprism viewfinder, flash, big lens, dial.
         ctx.beginPath()
@@ -967,8 +990,8 @@ export default function GrassField({ containerRef, nameRef, onDanceChange, onOpe
         ctx.lineTo(21, 6)
         ctx.stroke()
       } else if (name === 'file') {
-        ctx.stroke(new Path2D('M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'))
-        ctx.stroke(new Path2D('M14 2v6h6'))
+        ctx.stroke(iconPath('M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'))
+        ctx.stroke(iconPath('M14 2v6h6'))
         ctx.beginPath()
         ctx.moveTo(8, 13)
         ctx.lineTo(16, 13)
@@ -982,7 +1005,7 @@ export default function GrassField({ containerRef, nameRef, onDanceChange, onOpe
         ctx.beginPath()
         ctx.roundRect(8, 8, 14, 14, 2)
         ctx.stroke()
-        ctx.stroke(new Path2D('M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'))
+        ctx.stroke(iconPath('M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'))
       } else if (name === 'check') {
         ctx.beginPath()
         ctx.moveTo(5, 12.5)
@@ -1033,6 +1056,24 @@ export default function GrassField({ containerRef, nameRef, onDanceChange, onOpe
       ctx.beginPath()
       ctx.arc(tipX, tipY, pr, 0, Math.PI * 2)
       ctx.stroke()
+    }
+
+    // A jumbo blade's body: a round-capped stroke from root to tip. At rest the
+    // tip sits exactly on the root, and browsers may skip a zero-length stroke
+    // entirely (cap and all), so a near-degenerate body is filled as a disc.
+    function capsule(x0, y0, x1, y1, r, color) {
+      ctx.beginPath()
+      if (Math.hypot(x1 - x0, y1 - y0) < 0.5) {
+        ctx.fillStyle = color
+        ctx.arc(x1, y1, r, 0, Math.PI * 2)
+        ctx.fill()
+      } else {
+        ctx.strokeStyle = color
+        ctx.lineWidth = r * 2
+        ctx.moveTo(x0, y0)
+        ctx.lineTo(x1, y1)
+        ctx.stroke()
+      }
     }
 
     function drawBig(b, now, color = GRASS_COLOR) {
@@ -1100,21 +1141,36 @@ export default function GrassField({ containerRef, nameRef, onDanceChange, onOpe
 
       // pfp / icon — a capsule body from root to head, then the head on top.
       const sh = r * 0.16 * (b.kind === 'pfp' ? 0.7 : 1) // pfp gets a tighter shadow
-      ctx.strokeStyle = SHADOW_COLOR
-      ctx.lineWidth = r * 2
-      ctx.beginPath()
-      ctx.moveTo(baseX, baseY + sh)
-      ctx.lineTo(tipX, tipY + sh)
-      ctx.stroke()
-
-      ctx.strokeStyle = color
-      ctx.beginPath()
-      ctx.moveTo(baseX, baseY)
-      ctx.lineTo(tipX, tipY)
-      ctx.stroke()
+      capsule(baseX, baseY + sh, tipX, tipY + sh, r, SHADOW_COLOR)
+      capsule(baseX, baseY, tipX, tipY, r, color)
 
       if (b.kind === 'pfp') drawPhotoHead(tipX, tipY, r)
       else drawIconHead(b, tipX, tipY, r * 1.25)
+    }
+
+    // Contact shadows for the little blades, from their resolved tips (ex, ey).
+    // Resting blades are batched into one path (one stroke call instead of
+    // hundreds); they sit far enough apart that their shadows never touch, so
+    // this looks identical. Leaning blades can overlap a neighbour, and the
+    // translucent shadow must darken where two overlap, so those keep their
+    // own stroke.
+    function strokeShadows(shadowDy) {
+      ctx.strokeStyle = SHADOW_COLOR
+      ctx.lineWidth = BLADE_RADIUS * 2
+      ctx.beginPath()
+      for (const b of blades) {
+        if (b.lean * LAY_DISTANCE >= 1) continue
+        ctx.moveTo(b.x, b.y + shadowDy)
+        ctx.lineTo(b.ex, b.ey + shadowDy)
+      }
+      ctx.stroke()
+      for (const b of blades) {
+        if (b.lean * LAY_DISTANCE < 1) continue
+        ctx.beginPath()
+        ctx.moveTo(b.x, b.y + shadowDy)
+        ctx.lineTo(b.ex, b.ey + shadowDy)
+        ctx.stroke()
+      }
     }
 
     function draw(now) {
@@ -1135,24 +1191,19 @@ export default function GrassField({ containerRef, nameRef, onDanceChange, onOpe
       const shadowDy = BLADE_RADIUS * 0.55 // contact shadow drops straight down
 
       // Pass 1 — contact shadows beneath every blade.
-      ctx.strokeStyle = SHADOW_COLOR
-      ctx.lineWidth = BLADE_RADIUS * 2
-      for (const b of blades) {
-        ctx.beginPath()
-        ctx.moveTo(b.x, b.y + shadowDy)
-        ctx.lineTo(b.ex, b.ey + shadowDy)
-        ctx.stroke()
-      }
+      strokeShadows(shadowDy)
 
-      // Pass 2 — the solid bodies. A zero-length round cap is a perfect dot.
+      // Pass 2 — the solid bodies, all in one path: they're opaque and one
+      // colour, so a single stroke is pixel-identical to one per blade. A
+      // zero-length round cap is a perfect dot.
       ctx.strokeStyle = GRASS_COLOR
       ctx.lineWidth = BLADE_RADIUS * 2
+      ctx.beginPath()
       for (const b of blades) {
-        ctx.beginPath()
         ctx.moveTo(b.x, b.y)
         ctx.lineTo(b.ex, b.ey)
-        ctx.stroke()
       }
+      ctx.stroke()
 
       // The jumbo content blades sit on top of the field.
       for (const b of bigBlades) drawBig(b, now)
@@ -1215,18 +1266,8 @@ export default function GrassField({ containerRef, nameRef, onDanceChange, onOpe
       }
 
       const sh = r * 0.16 * (b.kind === 'pfp' ? 0.7 : 1) // pfp gets a tighter shadow
-      ctx.strokeStyle = SHADOW_COLOR
-      ctx.lineWidth = r * 2
-      ctx.beginPath()
-      ctx.moveTo(b.x, b.y + sh)
-      ctx.lineTo(tipX, tipY + sh)
-      ctx.stroke()
-
-      ctx.strokeStyle = color
-      ctx.beginPath()
-      ctx.moveTo(b.x, b.y)
-      ctx.lineTo(tipX, tipY)
-      ctx.stroke()
+      capsule(b.x, b.y + sh, tipX, tipY + sh, r, SHADOW_COLOR)
+      capsule(b.x, b.y, tipX, tipY, r, color)
 
       if (b.kind === 'pfp') drawPhotoHead(tipX, tipY, r)
       else drawIconHead(b, tipX, tipY, r * 1.25)
@@ -1284,15 +1325,7 @@ export default function GrassField({ containerRef, nameRef, onDanceChange, onOpe
         b.ex = b.x + Math.cos(b.angle) * b.lean * LAY_DISTANCE + bx
         b.ey = b.y + Math.sin(b.angle) * b.lean * LAY_DISTANCE + by
       }
-      const shadowDy = BLADE_RADIUS * 0.55
-      ctx.strokeStyle = SHADOW_COLOR
-      ctx.lineWidth = BLADE_RADIUS * 2
-      for (const b of blades) {
-        ctx.beginPath()
-        ctx.moveTo(b.x, b.y + shadowDy)
-        ctx.lineTo(b.ex, b.ey + shadowDy)
-        ctx.stroke()
-      }
+      strokeShadows(BLADE_RADIUS * 0.55)
       ctx.lineWidth = BLADE_RADIUS * 2
       for (const b of blades) {
         ctx.strokeStyle = fadeColor(mix, (b.danceHue + hueOffset) % 360)
@@ -1568,7 +1601,15 @@ export default function GrassField({ containerRef, nameRef, onDanceChange, onOpe
       container.addEventListener('pointerleave', onLeave)
     }
 
+    // Only rebuild on a real size change; a rebuild re-scatters the blades, so
+    // sub-pixel jitter (e.g. scrollbar rounding at fractional zoom) is ignored.
+    let observedW = -1
+    let observedH = -1
     const resize = new ResizeObserver(() => {
+      const rect = container.getBoundingClientRect()
+      if (Math.abs(rect.width - observedW) < 1 && Math.abs(rect.height - observedH) < 1) return
+      observedW = rect.width
+      observedH = rect.height
       build()
       if (reduced) draw(0)
     })

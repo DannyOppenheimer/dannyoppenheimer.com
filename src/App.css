@@ -198,6 +198,7 @@
   inset: 0;
   z-index: 101;
   overflow-y: auto;
+  overscroll-behavior: contain; /* don't chain scrolls to the locked page */
   padding: clamp(7rem, 16vh, 11rem) clamp(1rem, 3vw, 3.5rem) 2rem;
   opacity: 0;
   transition: opacity 0.25s ease;
